@@ -6,9 +6,16 @@ option(USE_FRAME_CAPTURE "build with frame capture support" OFF)
 option(USE_LOADER "build with EGL/GLESv2 loader" ON)
 option(USE_VULKAN "build with vulkan support" OFF)
 option(USE_METAL "build with metal support" OFF)
+
 if(WINDOWS_DESKTOP AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES arm)
   option(USE_D3D9 "build with d3d9 support" ON)
   option(USE_GL "build with native opengl/es support via wgl" ON)
+endif()
+
+# Force D3D9 on, GL off for Xbox 360
+if(XBOX360)
+  option(USE_D3D9 "build with d3d9 support" ON)
+  option(USE_GL "build with native opengl/es support via wgl" OFF)
 endif()
 
 if (APPLE)
@@ -26,39 +33,25 @@ add_definitions(
     -DANGLE_ENABLE_DEBUG_ANNOTATIONS
 )
 
-# configure_file(src/commit.h include/id/commit.h COPYONLY)
-# execute_process(
-#   COMMAND ${CMAKE_SOURCE_DIR}/src/commit_id.py check ${CMAKE_SOURCE_DIR}
-#   OUTPUT_VARIABLE IS_GIT_REPO
-#   OUTPUT_STRIP_TRAILING_WHITESPACE
-# )
-# if(IS_GIT_REPO STREQUAL 1)
-#     execute_process(
-#       COMMAND ${CMAKE_SOURCE_DIR}/src/commit_id.py gen ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/include/id/commit.h
-#       OUTPUT_VARIABLE IS_GIT_REPO
-#       OUTPUT_STRIP_TRAILING_WHITESPACE
-#     )
-# endif()
-
 file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/common/commit.h"
-	"#pragma once\n"
-	"#define ANGLE_COMMIT_HASH \"unknown\"\n"
-	"#define ANGLE_COMMIT_HASH_SIZE 7\n"
-	"#define ANGLE_COMMIT_DATE \"unknown\"\n"
-	"#define ANGLE_COMMIT_POSITION 0\n"
+    "#pragma once\n"
+    "#define ANGLE_COMMIT_HASH \"unknown\"\n"
+    "#define ANGLE_COMMIT_HASH_SIZE 7\n"
+    "#define ANGLE_COMMIT_DATE \"unknown\"\n"
+    "#define ANGLE_COMMIT_POSITION 0\n"
 )
 file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/common/angle_commit.h"
-	"#pragma once\n"
-	"#define ANGLE_COMMIT_HASH \"unknown\"\n"
-	"#define ANGLE_COMMIT_HASH_SIZE 7\n"
-	"#define ANGLE_COMMIT_DATE \"unknown\"\n"
-	"#define ANGLE_COMMIT_POSITION 0\n"
+    "#pragma once\n"
+    "#define ANGLE_COMMIT_HASH \"unknown\"\n"
+    "#define ANGLE_COMMIT_HASH_SIZE 7\n"
+    "#define ANGLE_COMMIT_DATE \"unknown\"\n"
+    "#define ANGLE_COMMIT_POSITION 0\n"
 )
 file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/common/ANGLEShaderProgramVersion.h"
-	"#pragma once\n"
-	"#define ANGLE_PROGRAM_VERSION_HASH \"unknown\"\n"
-	"#define ANGLE_PROGRAM_VERSION_HASH_SIZE 7\n"
-	"#define ANGLE_PROGRAM_VERSION \"unknown\"\n"
+    "#pragma once\n"
+    "#define ANGLE_PROGRAM_VERSION_HASH \"unknown\"\n"
+    "#define ANGLE_PROGRAM_VERSION_HASH_SIZE 7\n"
+    "#define ANGLE_PROGRAM_VERSION \"unknown\"\n"
 )
 
 include_directories(include src ${CMAKE_CURRENT_BINARY_DIR}/include)
@@ -66,7 +59,6 @@ include_directories(include src ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ##########
 # angle::common
-# android_util.h/cpp is required and not using android apis
 if(WINDOWS_DESKTOP)
     set(ANGLE_COMMON_PLATFORM_FILTER "_winuwp|_linux|_mac|_apple|_ios|_posix")
 elseif(WINDOWS_STORE)
@@ -75,7 +67,12 @@ elseif(LINUX)
     set(ANGLE_COMMON_PLATFORM_FILTER "_win|_mac|_apple|_ios")
 elseif(APPLE)
     set(ANGLE_COMMON_PLATFORM_FILTER "_linux|_win")
+elseif(XBOX360)
+    set(ANGLE_COMMON_PLATFORM_FILTER "_linux|_mac|_apple|_ios|_winuwp|_posix")
+else()
+    set(ANGLE_COMMON_PLATFORM_FILTER "_linux|_mac|_apple|_ios|_winuwp")
 endif()
+
 file(GLOB ANGLE_COMMON_SOURCES "src/common/*.h" "src/common/*.inl" "src/common/*.cpp" "src/common/third_party/base/anglebase/*.h" "src/common/third_party/base/anglebase/*.cc" "src/common/third_party/base/anglebase/containers/*.h" "src/common/third_party/base/anglebase/numerics/*.h" "src/common/third_party/base/anglebase/numerics/*.cc" "src/common/third_party/xxhash/*.h" "src/common/third_party/xxhash/*.c" "src/common/third_party/smhasher/src/*.h" "src/common/third_party/smhasher/src/*.cpp")
 list(FILTER ANGLE_COMMON_SOURCES EXCLUDE REGEX "_unittest|event_tracer|${ANGLE_COMMON_PLATFORM_FILTER}")
 if(NOT USE_FRAME_CAPTURE)
@@ -98,7 +95,6 @@ endif()
 ##########
 # angle::image_util
 file(GLOB ANGLE_IMAGE_UTIL_SOURCES "src/image_util/*.h" "src/image_util/*.inl" "src/image_util/*.cpp")
-# Exclude the ASTC decompressor to remove the astcenc.h dependency
 list(FILTER ANGLE_IMAGE_UTIL_SOURCES EXCLUDE REGEX "AstcDecompressor")
 add_library(angle_image_util STATIC ${ANGLE_IMAGE_UTIL_SOURCES})
 target_link_libraries(angle_image_util PRIVATE angle::common)
@@ -117,14 +113,16 @@ endif()
 add_library(angle_gpu_info_util STATIC ${ANGLE_GPU_INFO_UTIL_SOURCES})
 target_link_libraries(angle_gpu_info_util PRIVATE angle::common)
 add_library(angle::gpu_info_util ALIAS angle_gpu_info_util)
+
 if(WIN32)
   if(WINDOWS_DESKTOP)
-    set_property(SOURCE src/gpu_info_util/SystemInfo_win.cpp APPEND PROPERTY COMPILE_FLAGS "-DGPU_INFO_USE_SETUPAPI") # COMPILE_OPTIONS/INCLUDE_DIRECTORIES does not work
+    set_property(SOURCE src/gpu_info_util/SystemInfo_win.cpp APPEND PROPERTY COMPILE_FLAGS "-DGPU_INFO_USE_SETUPAPI")
     target_link_libraries(angle_gpu_info_util PRIVATE setupapi)
-  else()
-    set_property(SOURCE src/gpu_info_util/SystemInfo_win.cpp APPEND PROPERTY COMPILE_FLAGS "-DGPU_INFO_USE_DXGI") # COMPILE_OPTIONS/INCLUDE_DIRECTORIES does not work
+  elseif(NOT XBOX360) # Xbox doesn't use standard DXGI either
+    set_property(SOURCE src/gpu_info_util/SystemInfo_win.cpp APPEND PROPERTY COMPILE_FLAGS "-DGPU_INFO_USE_DXGI")
   endif()
 endif()
+
 ##########
 # angle::translator
 file(GLOB_RECURSE TRANSLATOR_SOURCES
@@ -138,16 +136,13 @@ if(NOT WIN32)
     list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "HLSL|hlsl")
 endif()
 if(NOT USE_VULKAN)
-	# Exclude the SPIR-V backend files
-	list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "SPIRV|spirv")
+    list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "SPIRV|spirv")
 endif()
 if(NOT APPLE)
-	list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "APPLE|apple")
-	list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "MSL|msl")
+    list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "APPLE|apple")
+    list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "MSL|msl")
 endif()
-# Exclude wgsl on linux
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "WGSL|wgsl")
-# Exclude the Rust IR builder source file since we are using the header stubs
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "src/compiler/translator/ir/src")
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "Vulkan")
 add_library(angle_translator STATIC ${TRANSLATOR_SOURCES})
@@ -155,11 +150,14 @@ target_compile_definitions(angle_translator PRIVATE
     -DANGLE_ENABLE_ESSL
     -DANGLE_ENABLE_GLSL
 )
-if(WIN32)
+if(WIN32) # XBOX360 uses WIN32 so HLSL is correctly enabled here
     target_compile_definitions(angle_translator PRIVATE -DANGLE_ENABLE_HLSL)
 endif()
 
-find_package(GTest)
+if(NOT XBOX360)
+    find_package(GTest)
+endif()
+
 if(NOT GTest_FOUND)
   include(FetchContent)
   FetchContent_Declare(
@@ -187,7 +185,7 @@ add_library(angle::preprocessor ALIAS angle_preprocessor)
 # libANGLE
 
 ## OpenGL Renderer
-if(USE_GL AND WINDOWS_DESKTOP OR LINUX OR APPLE)
+if(USE_GL AND (WINDOWS_DESKTOP OR LINUX OR APPLE))
     if(WINDOWS_DESKTOP)
         set(ANGLE_RENDERER_OPENGL_PLATFORM
             "src/libANGLE/renderer/gl/wgl/*.cpp"
@@ -224,7 +222,7 @@ if(USE_GL AND WINDOWS_DESKTOP OR LINUX OR APPLE)
 endif()
 
 # D3D Renderers
-if(WIN32)
+if(WIN32 OR XBOX360)
     ## All D3D Sources
     file(GLOB_RECURSE LIBANGLE_D3D_SOURCES
         "src/libANGLE/renderer/d3d/*.cpp"
@@ -242,8 +240,8 @@ if(WIN32)
         add_library(angle::renderer::winrt ALIAS angle_renderer_winrt)
     endif()
 
-    ## Win32/d3d9 D3D Renderer
-    if(WINDOWS_DESKTOP)
+    ## Win32/d3d9 D3D Renderer (Used by Desktop AND Xbox 360)
+    if(WINDOWS_DESKTOP OR XBOX360)
         set(LIBANGLE_D3D_DESKTOP_SOURCES ${LIBANGLE_D3D_SOURCES})
         if(USE_D3D9)
             list(FILTER LIBANGLE_D3D_DESKTOP_SOURCES INCLUDE REGEX "d3d9|win32|converged")
@@ -252,30 +250,45 @@ if(WIN32)
         endif()
         add_library(angle_renderer_win32 INTERFACE)
         target_sources(angle_renderer_win32 INTERFACE ${LIBANGLE_D3D_DESKTOP_SOURCES})
+
         if(USE_D3D9)
             target_compile_definitions(angle_renderer_win32 INTERFACE -DANGLE_ENABLE_D3D9)
-            target_link_libraries(angle_renderer_win32 INTERFACE d3d9)
+            # Xbox 360 toolchain manages its own graphics libs automatically, don't force desktop d3d9 link
+            if(NOT XBOX360)
+                target_link_libraries(angle_renderer_win32 INTERFACE d3d9)
+            endif()
         endif()
-        target_link_libraries(angle_renderer_win32 INTERFACE user32 gdi32)
+
+        # Don't link standard Windows UI libraries on a console
+        if(NOT XBOX360)
+            target_link_libraries(angle_renderer_win32 INTERFACE user32 gdi32)
+        endif()
+
         add_library(angle::renderer::win32 ALIAS angle_renderer_win32)
-        if(CMAKE_HOST_WIN32)
-            set_property(SOURCE src/libANGLE/renderer/d3d/HLSLCompiler.cpp APPEND PROPERTY COMPILE_FLAGS "-DANGLE_PRELOADED_D3DCOMPILER_MODULE_NAMES={\\\"d3dcompiler_47.dll\\\",\\\"d3dcompiler_46.dll\\\",\\\"d3dcompiler_43.dll\\\"}")
-        else() # do not let bash expend {xx,oo}
-            set_property(SOURCE src/libANGLE/renderer/d3d/HLSLCompiler.cpp APPEND PROPERTY COMPILE_FLAGS "-DANGLE_PRELOADED_D3DCOMPILER_MODULE_NAMES='{\"d3dcompiler_47.dll\",\"d3dcompiler_46.dll\",\"d3dcompiler_43.dll\"}'")
+
+        # Avoid forcing D3D compiler DLL load hacks on the Xbox 360
+        if(NOT XBOX360)
+            if(CMAKE_HOST_WIN32)
+                set_property(SOURCE src/libANGLE/renderer/d3d/HLSLCompiler.cpp APPEND PROPERTY COMPILE_FLAGS "-DANGLE_PRELOADED_D3DCOMPILER_MODULE_NAMES={\\\"d3dcompiler_47.dll\\\",\\\"d3dcompiler_46.dll\\\",\\\"d3dcompiler_43.dll\\\"}")
+            else()
+                set_property(SOURCE src/libANGLE/renderer/d3d/HLSLCompiler.cpp APPEND PROPERTY COMPILE_FLAGS "-DANGLE_PRELOADED_D3DCOMPILER_MODULE_NAMES='{\"d3dcompiler_47.dll\",\"d3dcompiler_46.dll\",\"d3dcompiler_43.dll\"}'")
+            endif()
         endif()
     endif()
 
-    ## D3D11 Base renderer
-    list(FILTER LIBANGLE_D3D_SOURCES EXCLUDE REGEX "winrt|d3d9|win32") #|converged
-    find_library(DXGUID_LIB NAMES dxguid)
-    find_library(D3D11_LIB NAMES d3d11)
-    add_library(angle_renderer_d3d INTERFACE)
-    target_sources(angle_renderer_d3d INTERFACE ${LIBANGLE_D3D_SOURCES})
-    target_compile_definitions(angle_renderer_d3d INTERFACE
-        -DANGLE_ENABLE_D3D11
-    )
-    target_link_libraries(angle_renderer_d3d INTERFACE d3d11 dxgi dxguid) #${D3D11_LIB} ${DXGUID_LIB})
-    add_library(angle::renderer::d3d ALIAS angle_renderer_d3d)
+    ## D3D11 Base renderer - SKIP ENTIRELY FOR XBOX 360
+    if(NOT XBOX360)
+        list(FILTER LIBANGLE_D3D_SOURCES EXCLUDE REGEX "winrt|d3d9|win32")
+        find_library(DXGUID_LIB NAMES dxguid)
+        find_library(D3D11_LIB NAMES d3d11)
+        add_library(angle_renderer_d3d INTERFACE)
+        target_sources(angle_renderer_d3d INTERFACE ${LIBANGLE_D3D_SOURCES})
+        target_compile_definitions(angle_renderer_d3d INTERFACE
+            -DANGLE_ENABLE_D3D11
+        )
+        target_link_libraries(angle_renderer_d3d INTERFACE d3d11 dxgi dxguid)
+        add_library(angle::renderer::d3d ALIAS angle_renderer_d3d)
+    endif()
 endif()
 
 ## Core libANGLE library
@@ -303,10 +316,6 @@ file(GLOB LIBANGLE_SOURCES
     "src/libANGLE/renderer/*.inl"
     "src/libANGLE/renderer/*.h"
 
-    #"src/libANGLE/renderer/null/*.cpp"
-    #"src/libANGLE/renderer/null/*.inl"
-    #"src/libANGLE/renderer/null/*.h"
-
     ${LIBANGLE_SOURCES_PLATFORM}
 )
 list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "_unittest")
@@ -316,18 +325,23 @@ else()
     list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "FrameCapture.cpp")
 endif()
 if(NOT USE_VULKAN AND NOT USE_METAL)
-    list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "glslang_wrapper_utils.cpp") # need glslang source
+    list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "glslang_wrapper_utils.cpp")
 endif()
-# Exclude OpenCL front-end and renderer files from the build
+
+# Purge OpenCL
 list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/.*CL.*")
 list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/.*cl_.*")
 list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/renderer/.*CL.*")
 list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/renderer/.*cl_.*")
-# Add this to drop Windows-specific render utilities on Linux/macOS
+
+# Drop Windows-specific render utilities on Linux/macOS, drop DXGI entirely for Xbox 360
 if(NOT WIN32)
     list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/renderer/d3d")
     list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/renderer/dxgi")
+elseif(XBOX360)
+    list(FILTER LIBANGLE_SOURCES EXCLUDE REGEX "src/libANGLE/renderer/dxgi")
 endif()
+
 if(LINUX OR APPLE)
     set(LIBANGLE_RENDERER_PLATFORM
         angle::renderer::opengl
@@ -345,6 +359,11 @@ elseif(WINDOWS_DESKTOP)
     if(USE_GL)
         list(APPEND LIBANGLE_RENDERER_PLATFORM angle::renderer::opengl)
     endif()
+elseif(XBOX360)
+    set(LIBANGLE_RENDERER_PLATFORM
+        # Deliberately omit angle::renderer::d3d (D3D11)
+        angle::renderer::win32 # Contains D3D9
+    )
 else()
     set(LIBANGLE_RENDERER_PLATFORM )
 endif()
@@ -368,7 +387,6 @@ target_link_libraries(libANGLE PRIVATE
 )
 target_include_directories(libANGLE PRIVATE "src/third_party/khronos")
 target_compile_definitions(libANGLE
-    #PRIVATE -DANGLE_ENABLE_NULL
     PUBLIC
         -DLIBANGLE_IMPLEMENTATION
         ${LIBANGLE_RENDERER_COMPILEDEF}
@@ -379,8 +397,7 @@ add_library(angle::libANGLE ALIAS libANGLE)
 ##########
 # libGLESv2
 file(GLOB LIBGLESV2_SOURCES "src/libGLESv2/*.h" "src/libGLESv2/*.cpp" "src/libGLESv2/libGLESv2_autogen.def")
-list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "proc_table_autogen|proc_table_gles_autogen") # unused, and duplicated symbols
-# Add these lines to strip out the OpenCL stubs:
+list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "proc_table_autogen|proc_table_gles_autogen")
 list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "src/libGLESv2/.*CL.*")
 list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "src/libGLESv2/.*cl_.*")
 add_library(libGLESv2 SHARED ${LIBGLESV2_SOURCES})
@@ -390,33 +407,25 @@ target_compile_definitions(libGLESv2
     PUBLIC
         -DGL_GLEXT_PROTOTYPES
         -DGL_GLES_PROTOTYPES=1
-        # static only
-        #        -DGL_APICALL=
-        #        -DEGLAPI=
-        #        -DGL_API=
 )
 target_include_directories(libGLESv2 PUBLIC "$<INSTALL_INTERFACE:include>")
 
 ##########
 # libEGL
 file(GLOB LIBEGL_SOURCES "src/libEGL/*.cpp" "src/libEGL/*.h" "src/libEGL/libEGL.def")
-# "src/libEGL/libEGL.def": duplicate /export because EGLAPI is defined as dllexport
 add_library(libEGL SHARED
     ${LIBEGL_SOURCES}
-    #    "src/libEGL/libEGL.rc"
 )
 target_link_libraries(libEGL PRIVATE angle::common angle::libANGLE libGLESv2)
 target_include_directories(libEGL PUBLIC "$<INSTALL_INTERFACE:include>")
 target_include_directories(libEGL PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
-target_compile_definitions(libEGL PRIVATE -DLIBEGL_IMPLEMENTATION -DEGL_EGL_PROTOTYPES=1 -DEGL_EGLEXT_PROTOTYPES) # EGL_EGL_PROTOTYPES: function declarations with default visibility via EGLAPI
-target_compile_definitions(libEGL PRIVATE -DANGLE_USE_EGL_LOADER -DANGLE_GLESV2_LIBRARY_NAME=\"libGLESv2\" -DANGLE_EGL_LIBRARY_NAME=\"libEGL\") # TODO: option?
 
 if(NOT MSVC)
     target_compile_definitions(libGLESv2 PRIVATE -DGL_APICALL=__attribute__\(\(visibility\(\"default\"\)\)\))
     target_compile_definitions(libEGL PRIVATE -DEGLAPI=__attribute__\(\(visibility\(\"default\"\)\)\))
 else()
-    target_compile_definitions(libGLESv2 PRIVATE -DGL_API= -DGL_APICALL=)#__declspec\(dllexport\): exports_eglXXX@?
-    target_compile_definitions(libEGL PRIVATE -DEGLAPI=)#__declspec\(dllexport\): exports_eglXXX@?
+    target_compile_definitions(libGLESv2 PRIVATE -DGL_API= -DGL_APICALL=)
+    target_compile_definitions(libEGL PRIVATE -DEGLAPI=)
 endif()
 
 target_compile_definitions(libEGL PRIVATE
@@ -425,7 +434,6 @@ target_compile_definitions(libEGL PRIVATE
     -DEGL_EGLEXT_PROTOTYPES
     -DANGLE_USE_EGL_LOADER
     -DANGLE_EGL_LIBRARY_NAME=\"libEGL\"
-    # Map the dispatch library definition that the autogen file is looking for:
     -DANGLE_DISPATCH_LIBRARY=\"libGLESv2\"
 )
 
@@ -438,8 +446,6 @@ install(TARGETS libEGL libGLESv2 EXPORT ANGLEExport
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
-
-#install(EXPORT ANGLEExport FILE unofficial-angle-config.cmake NAMESPACE unofficial::angle:: DESTINATION share/unofficial-angle)
 
 if(NOT DISABLE_INSTALL_HEADERS)
     install(
