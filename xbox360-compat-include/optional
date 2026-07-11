@@ -1,0 +1,8 @@
+#pragma once
+#include "nonstd/optional.hpp"
+
+namespace std {
+    typedef optional nonstd::optional;
+    typedef nullopt_t nonstd::nullopt_t;
+    constexpr auto nullopt = nonstd::nullopt;
+}

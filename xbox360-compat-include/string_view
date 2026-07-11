@@ -1,0 +1,7 @@
+#pragma once
+#include "nonstd/string_view.hpp"
+
+namespace std {
+    typedef string_view nonstd::string_view;
+    typedef wstring_view nonstd::wstring_view;
+}

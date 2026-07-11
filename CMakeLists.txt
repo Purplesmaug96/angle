@@ -3,7 +3,7 @@ project(angle CXX C)
 include(config.cmake)
 
 if(XBOX360)
-    set(XBOX360_DEFAULT_XEX_CONFIG "${CMAKE_SOURCE_DIR}/xexconf.xml" CACHE PATH "Default XEX config file")
+    set(XBOX360_DEFAULT_XEX_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/xexconf.xml" CACHE PATH "Default XEX config file")
 
     function(angle_add_library target_name)
         set(ARG_LIST ${ARGN})
@@ -38,6 +38,10 @@ if(XBOX360)
             add_xenon_library(${target_name} "${ARG_LIST}")
         endif()
     endfunction()
+
+	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/xbox360-compat-include")
+
+	add_compile_definitions(XBOX360)
 endif()
 
 option(USE_FRAME_CAPTURE "build with frame capture support" OFF)

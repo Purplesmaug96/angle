@@ -1,0 +1,11 @@
+#pragma once
+#include "nonstd/variant.hpp"
+
+namespace std {
+    typedef variant nonstd::variant;
+    typedef monostate nonstd::monostate;
+    using nonstd::get;
+    using nonstd::get_if;
+    using nonstd::holds_alternative;
+    using nonstd::visit;
+}
