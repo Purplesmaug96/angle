@@ -178,9 +178,9 @@ file(GLOB_RECURSE TRANSLATOR_SOURCES
     "src/compiler/translator/*.cpp"
     "src/third_party/compiler/ArrayBoundsClamper.cpp"
 )
-if(NOT WIN32)
-    list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "HLSL|hlsl")
-endif()
+# if(NOT WIN32)
+#     list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "HLSL|hlsl")
+# endif()
 if(NOT USE_VULKAN)
     list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "SPIRV|spirv")
 endif()
@@ -192,6 +192,7 @@ list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "WGSL|wgsl")
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "src/compiler/translator/ir/src")
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "Vulkan")
 angle_add_library(angle_translator STATIC ${TRANSLATOR_SOURCES})
+target_compile_definitions(angle_translator PRIVATE -DANGLE_ENABLE_HLSL)
 target_compile_definitions(angle_translator PRIVATE
     -DANGLE_ENABLE_ESSL
     -DANGLE_ENABLE_GLSL
@@ -389,6 +390,11 @@ elseif(XBOX360)
 endif()
 
 if(LINUX OR APPLE)
+    # Fallback stub for building the translator interface on Linux without standard rendering dependencies
+    if(NOT TARGET angle::renderer::opengl)
+        add_library(angle_renderer_opengl_stub INTERFACE)
+        add_library(angle::renderer::opengl ALIAS angle_renderer_opengl_stub)
+    endif()
     set(LIBANGLE_RENDERER_PLATFORM
         angle::renderer::opengl
     )
