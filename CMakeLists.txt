@@ -2,6 +2,44 @@ cmake_minimum_required(VERSION 3.8)
 project(angle CXX C)
 include(config.cmake)
 
+if(XBOX360)
+    set(XBOX360_DEFAULT_XEX_CONFIG "${CMAKE_SOURCE_DIR}/xexconf.xml" CACHE PATH "Default XEX config file")
+
+    function(angle_add_library target_name)
+        set(ARG_LIST ${ARGN})
+
+        # Detect target type flags
+        list(FIND ARG_LIST "ALIAS" IS_ALIAS)
+        list(FIND ARG_LIST "INTERFACE" IS_INTERFACE)
+        list(FIND ARG_LIST "SHARED" IS_SHARED)
+
+        if(IS_ALIAS GREATER -1)
+            # The signature requires: add_library(<name> ALIAS <target>)
+            # Remove ALIAS from the list so only the target name remains
+            list(REMOVE_ITEM ARG_LIST "ALIAS")
+            add_library(${target_name} ALIAS ${ARG_LIST})
+
+        elseif(IS_INTERFACE GREATER -1)
+            # The signature requires: add_library(<name> INTERFACE)
+            list(REMOVE_ITEM ARG_LIST "INTERFACE")
+            add_library(${target_name} INTERFACE)
+
+            # If there are trailing source arguments left over, append them properly
+            if(ARG_LIST)
+                target_sources(${target_name} INTERFACE ${ARG_LIST})
+            endif()
+
+        elseif(IS_SHARED GREATER -1)
+            list(REMOVE_ITEM ARG_LIST "SHARED")
+            add_xenon_module(${target_name} "${XBOX360_DEFAULT_XEX_CONFIG}" "${ARG_LIST}")
+
+        else()
+            list(REMOVE_ITEM ARG_LIST "STATIC")
+            add_xenon_library(${target_name} "${ARG_LIST}")
+        endif()
+    endfunction()
+endif()
+
 option(USE_FRAME_CAPTURE "build with frame capture support" OFF)
 option(USE_LOADER "build with EGL/GLESv2 loader" ON)
 option(USE_VULKAN "build with vulkan support" OFF)
@@ -78,10 +116,10 @@ list(FILTER ANGLE_COMMON_SOURCES EXCLUDE REGEX "_unittest|event_tracer|${ANGLE_C
 if(NOT USE_FRAME_CAPTURE)
     list(FILTER ANGLE_COMMON_SOURCES EXCLUDE REGEX "frame_capture")
 endif()
-add_library(angle_common STATIC ${ANGLE_COMMON_SOURCES})
+angle_add_library(angle_common STATIC ${ANGLE_COMMON_SOURCES})
 target_include_directories(angle_common PUBLIC src/common/third_party/base)
 target_include_directories(angle_common PUBLIC src/common/base)
-add_library(angle::common ALIAS angle_common)
+angle_add_library(angle::common ALIAS angle_common)
 if(CMAKE_CL_64 OR CMAKE_SYSTEM_PROCESSOR MATCHES 64)
   target_compile_definitions(angle_common INTERFACE -DANGLE_IS_64_BIT_CPU)
 else()
@@ -96,9 +134,9 @@ endif()
 # angle::image_util
 file(GLOB ANGLE_IMAGE_UTIL_SOURCES "src/image_util/*.h" "src/image_util/*.inl" "src/image_util/*.cpp")
 list(FILTER ANGLE_IMAGE_UTIL_SOURCES EXCLUDE REGEX "AstcDecompressor")
-add_library(angle_image_util STATIC ${ANGLE_IMAGE_UTIL_SOURCES})
+angle_add_library(angle_image_util STATIC ${ANGLE_IMAGE_UTIL_SOURCES})
 target_link_libraries(angle_image_util PRIVATE angle::common)
-add_library(angle::image_util ALIAS angle_image_util)
+angle_add_library(angle::image_util ALIAS angle_image_util)
 
 set(ANGLE_GPU_INFO_UTIL_SOURCES src/gpu_info_util/SystemInfo.cpp)
 if(APPLE)
@@ -110,9 +148,9 @@ elseif(ANDROID)
 else()
   list(APPEND ANGLE_GPU_INFO_UTIL_SOURCES src/gpu_info_util/SystemInfo_linux.cpp)
 endif()
-add_library(angle_gpu_info_util STATIC ${ANGLE_GPU_INFO_UTIL_SOURCES})
+angle_add_library(angle_gpu_info_util STATIC ${ANGLE_GPU_INFO_UTIL_SOURCES})
 target_link_libraries(angle_gpu_info_util PRIVATE angle::common)
-add_library(angle::gpu_info_util ALIAS angle_gpu_info_util)
+angle_add_library(angle::gpu_info_util ALIAS angle_gpu_info_util)
 
 if(WIN32)
   if(WINDOWS_DESKTOP)
@@ -145,7 +183,7 @@ endif()
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "WGSL|wgsl")
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "src/compiler/translator/ir/src")
 list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX "Vulkan")
-add_library(angle_translator STATIC ${TRANSLATOR_SOURCES})
+angle_add_library(angle_translator STATIC ${TRANSLATOR_SOURCES})
 target_compile_definitions(angle_translator PRIVATE
     -DANGLE_ENABLE_ESSL
     -DANGLE_ENABLE_GLSL
@@ -169,7 +207,7 @@ if(NOT GTest_FOUND)
 endif()
 
 target_link_libraries(angle_translator PRIVATE angle::common gtest)
-add_library(angle::translator ALIAS angle_translator)
+angle_add_library(angle::translator ALIAS angle_translator)
 
 ##########
 # angle::preprocessor
@@ -177,9 +215,9 @@ file(GLOB PREPROCESSOR_SOURCES
     "src/compiler/preprocessor/*.h"
     "src/compiler/preprocessor/*.cpp"
 )
-add_library(angle_preprocessor STATIC ${PREPROCESSOR_SOURCES})
+angle_add_library(angle_preprocessor STATIC ${PREPROCESSOR_SOURCES})
 target_link_libraries(angle_preprocessor PRIVATE angle::common)
-add_library(angle::preprocessor ALIAS angle_preprocessor)
+angle_add_library(angle::preprocessor ALIAS angle_preprocessor)
 
 ##########
 # libANGLE
@@ -215,10 +253,10 @@ if(USE_GL AND (WINDOWS_DESKTOP OR LINUX OR APPLE))
         ${ANGLE_RENDERER_OPENGL_PLATFORM}
     )
     list(FILTER LIBANGLE_GL_SOURCES EXCLUDE REGEX "_unittest")
-    add_library(angle_renderer_opengl INTERFACE)
+    angle_add_library(angle_renderer_opengl INTERFACE)
     target_sources(angle_renderer_opengl INTERFACE ${LIBANGLE_GL_SOURCES})
     target_compile_definitions(angle_renderer_opengl INTERFACE -DANGLE_ENABLE_OPENGL)
-    add_library(angle::renderer::opengl ALIAS angle_renderer_opengl)
+    angle_add_library(angle::renderer::opengl ALIAS angle_renderer_opengl)
 endif()
 
 # D3D Renderers
@@ -235,9 +273,9 @@ if(WIN32 OR XBOX360)
     if(WINDOWS_STORE)
         set(LIBANGLE_D3D_WINRT_SOURCES ${LIBANGLE_D3D_SOURCES})
         list(FILTER LIBANGLE_D3D_WINRT_SOURCES INCLUDE REGEX "winrt")
-        add_library(angle_renderer_winrt INTERFACE)
+        angle_add_library(angle_renderer_winrt INTERFACE)
         target_sources(angle_renderer_winrt INTERFACE ${LIBANGLE_D3D_WINRT_SOURCES})
-        add_library(angle::renderer::winrt ALIAS angle_renderer_winrt)
+        angle_add_library(angle::renderer::winrt ALIAS angle_renderer_winrt)
     endif()
 
     ## Win32/d3d9 D3D Renderer (Used by Desktop AND Xbox 360)
@@ -248,7 +286,7 @@ if(WIN32 OR XBOX360)
         else()
             list(FILTER LIBANGLE_D3D_DESKTOP_SOURCES INCLUDE REGEX "win32|converged")
         endif()
-        add_library(angle_renderer_win32 INTERFACE)
+        angle_add_library(angle_renderer_win32 INTERFACE)
         target_sources(angle_renderer_win32 INTERFACE ${LIBANGLE_D3D_DESKTOP_SOURCES})
 
         if(USE_D3D9)
@@ -264,7 +302,7 @@ if(WIN32 OR XBOX360)
             target_link_libraries(angle_renderer_win32 INTERFACE user32 gdi32)
         endif()
 
-        add_library(angle::renderer::win32 ALIAS angle_renderer_win32)
+        angle_add_library(angle::renderer::win32 ALIAS angle_renderer_win32)
 
         # Avoid forcing D3D compiler DLL load hacks on the Xbox 360
         if(NOT XBOX360)
@@ -281,13 +319,13 @@ if(WIN32 OR XBOX360)
         list(FILTER LIBANGLE_D3D_SOURCES EXCLUDE REGEX "winrt|d3d9|win32")
         find_library(DXGUID_LIB NAMES dxguid)
         find_library(D3D11_LIB NAMES d3d11)
-        add_library(angle_renderer_d3d INTERFACE)
+        angle_add_library(angle_renderer_d3d INTERFACE)
         target_sources(angle_renderer_d3d INTERFACE ${LIBANGLE_D3D_SOURCES})
         target_compile_definitions(angle_renderer_d3d INTERFACE
             -DANGLE_ENABLE_D3D11
         )
         target_link_libraries(angle_renderer_d3d INTERFACE d3d11 dxgi dxguid)
-        add_library(angle::renderer::d3d ALIAS angle_renderer_d3d)
+        angle_add_library(angle::renderer::d3d ALIAS angle_renderer_d3d)
     endif()
 endif()
 
@@ -376,7 +414,7 @@ else()
     set(LIBANGLE_RENDERER_COMPILEDEF )
 endif()
 
-add_library(libANGLE STATIC ${LIBANGLE_SOURCES})
+angle_add_library(libANGLE STATIC ${LIBANGLE_SOURCES})
 target_link_libraries(libANGLE PRIVATE
     angle::common
     angle::gpu_info_util
@@ -392,7 +430,7 @@ target_compile_definitions(libANGLE
         ${LIBANGLE_RENDERER_COMPILEDEF}
         -DANGLE_CAPTURE_ENABLED=$<BOOL:${USE_FRAME_CAPTURE}>
 )
-add_library(angle::libANGLE ALIAS libANGLE)
+angle_add_library(angle::libANGLE ALIAS libANGLE)
 
 ##########
 # libGLESv2
@@ -400,7 +438,7 @@ file(GLOB LIBGLESV2_SOURCES "src/libGLESv2/*.h" "src/libGLESv2/*.cpp" "src/libGL
 list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "proc_table_autogen|proc_table_gles_autogen")
 list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "src/libGLESv2/.*CL.*")
 list(FILTER LIBGLESV2_SOURCES EXCLUDE REGEX "src/libGLESv2/.*cl_.*")
-add_library(libGLESv2 SHARED ${LIBGLESV2_SOURCES})
+angle_add_library(libGLESv2 SHARED ${LIBGLESV2_SOURCES})
 target_link_libraries(libGLESv2 PRIVATE angle::common angle::libANGLE)
 target_compile_definitions(libGLESv2
     PRIVATE -DLIBGLESV2_IMPLEMENTATION
@@ -413,7 +451,7 @@ target_include_directories(libGLESv2 PUBLIC "$<INSTALL_INTERFACE:include>")
 ##########
 # libEGL
 file(GLOB LIBEGL_SOURCES "src/libEGL/*.cpp" "src/libEGL/*.h" "src/libEGL/libEGL.def")
-add_library(libEGL SHARED
+angle_add_library(libEGL SHARED
     ${LIBEGL_SOURCES}
 )
 target_link_libraries(libEGL PRIVATE angle::common angle::libANGLE libGLESv2)
