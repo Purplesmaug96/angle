@@ -42,6 +42,10 @@ if(XBOX360)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/xbox360-compat-include")
 
 	add_compile_definitions(XBOX360)
+else()
+	function(angle_add_library)
+		add_library(${ARGV})
+	endfunction()
 endif()
 
 option(USE_FRAME_CAPTURE "build with frame capture support" OFF)
