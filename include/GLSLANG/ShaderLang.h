@@ -474,6 +474,11 @@ struct ShCompileOptions
     // still be reflected.
     uint64_t skipAllValidationAndTransforms : 1;
 
+    // === Butterscotch: per-optimisation toggle flags (for diagnosing ANGLE HLSL bugs) ===
+    uint64_t skipFoldExpressions : 1;
+    uint64_t skipPruneNoOps : 1;
+    uint64_t skipRemoveUnreferencedVariables : 1;
+
     uint64_t transformFloatUniformTo16Bits : 1;
 
     // Whether the ANGLE IR should be used.  Ineffective if ANGLE is built without IR support.

@@ -783,12 +783,15 @@ bool TCompiler::checkAndSimplifyAST(TIntermBlock *root,
 
     // Fold expressions that could not be folded before validation that was done as a part of
     // parsing.
-    if (!FoldExpressions(this, root, &mDiagnostics))
+    if (!compileOptions.skipFoldExpressions)
     {
-        return false;
+        if (!FoldExpressions(this, root, &mDiagnostics))
+        {
+            return false;
+        }
+        // Folding should only be able to generate warnings.
+        ASSERT(mDiagnostics.numErrors() == 0);
     }
-    // Folding should only be able to generate warnings.
-    ASSERT(mDiagnostics.numErrors() == 0);
 
     const bool hasAnyClipCullDistance =
         parseContext.isExtensionEnabled(TExtension::ANGLE_clip_cull_distance) ||
@@ -824,11 +827,14 @@ bool TCompiler::checkAndSimplifyAST(TIntermBlock *root,
     //      invalid ESSL.
     //   3. Any unreachable statement after a discard, return, break or continue.
     // After this empty declarations are not allowed in the AST.
-    if (!PruneNoOps(this, root, &mSymbolTable))
+    if (!compileOptions.skipPruneNoOps)
     {
-        return false;
+        if (!PruneNoOps(this, root, &mSymbolTable))
+        {
+            return false;
+        }
     }
-    mValidateASTOptions.validateNoStatementsAfterBranch = true;
+    mValidateASTOptions.validateNoStatementsAfterBranch = !compileOptions.skipPruneNoOps;
 
     // We need to generate globals early if we have non constant initializers enabled.
     bool initializeLocalsAndGlobals    = compileOptions.initializeUninitializedLocals;
@@ -1010,14 +1016,20 @@ bool TCompiler::checkAndSimplifyAST(TIntermBlock *root,
     }
     // Fold the expressions again, because |RemoveArrayLengthMethod| can introduce new
     // constants.
-    if (!FoldExpressions(this, root, &mDiagnostics))
+    if (!compileOptions.skipFoldExpressions)
     {
-        return false;
+        if (!FoldExpressions(this, root, &mDiagnostics))
+        {
+            return false;
+        }
     }
 
-    if (!RemoveUnreferencedVariables(this, root, &mSymbolTable))
+    if (!compileOptions.skipRemoveUnreferencedVariables)
     {
-        return false;
+        if (!RemoveUnreferencedVariables(this, root, &mSymbolTable))
+        {
+            return false;
+        }
     }
 
     // In case the last case inside a switch statement is a certain type of no-op, GLSL
